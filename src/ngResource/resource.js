@@ -457,39 +457,24 @@ angular.module('ngResource', ['ng']).
               "Expected up to 4 arguments [params, data, success, error], got {0} arguments", arguments.length);
           }
 
-          var isInstanceCall = data instanceof Resource;
-          var value = isInstanceCall ? data : (action.isArray ? [] : new Resource(data));
-          var httpConfig = {};
-          var responseInterceptor = action.interceptor && action.interceptor.response || defaultResponseInterceptor;
-          var responseErrorInterceptor = action.interceptor && action.interceptor.responseError || undefined;
+          var value = this instanceof Resource ? this : (action.isArray ? [] : new Resource(data));
+          $http({
+            method: action.method,
+            url: route.url(extend({}, extractParams(data), action.params || {}, params)),
+            data: data,
+            useXDomain: $http.defaults.useXDomain || false
+          }).then(function(response) {
+              var data = response.data;
 
-          forEach(action, function(value, key) {
-            if (key != 'params' && key != 'isArray' && key != 'interceptor') {
-              httpConfig[key] = copy(value);
-            }
-          });
-
-          if (hasBody) httpConfig.data = data;
-          route.setUrlParams(httpConfig, extend({}, extractParams(data, action.params || {}), params), action.url);
-
-          var promise = $http(httpConfig).then(function(response) {
-            var data = response.data,
-                promise = value.$promise;
-
-            if (data) {
-              if ( angular.isArray(data) != !!action.isArray ) {
-                throw $resourceMinErr('badcfg', 'Error in resource configuration. Expected response' +
-                  ' to contain an {0} but got an {1}',
-                  action.isArray?'array':'object', angular.isArray(data)?'array':'object');
-              }
-              if (action.isArray) {
-                value.length = 0;
-                forEach(data, function(item) {
-                  value.push(new Resource(item));
-                });
-              } else {
-                copy(data, value);
-                value.$promise = promise;
+              if (data) {
+                if (action.isArray) {
+                  value.length = 0;
+                  forEach(data, function(item) {
+                    value.push(new Resource(item));
+                  });
+                } else {
+                  copy(data, value);
+                }
               }
             }
 
